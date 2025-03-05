@@ -1,24 +1,30 @@
 #!/bin/bash
 
-# دریافت اطلاعات از کاربر
-read -p "Enter IP Server Iran: " IPv4_IRAN
-read -p "Enter IP Server Out: " IPv4_KHAREJ
-read -p "Enter IPv6 Local Iran: " IPv6_IRAN
-read -p "Enter IPv6 Local Out: " IPv6_KHAREJ
+# بررسی دسترسی sudo
+check_sudo() {
+    if sudo -n true 2>/dev/null; then
+        echo "This user has sudo permissions"
+    else
+        echo "This user does not have sudo permissions"
+        exit 1
+    fi
+}
 
-# ارائه گزینه‌ها
-echo "Choose an option:"
-echo "1 - Server Iran"
-echo "2 - Server Kharej"
-read -p "Enter your choice (1/2): " CHOICE
+# نصب بسته‌ها
+install_package() {
+    package=$1
+    if ! command -v $package &> /dev/null; then
+        echo "Installing $package..."
+        sudo apt-get install -y $package
+        echo "$package installed ✓"
+    else
+        echo "$package is already installed ✓"
+    fi
+}
 
-# حذف prefix از IPv6 (در صورت وجود)
-IPv6_IRAN=$(echo "$IPv6_IRAN" | cut -d'/' -f1)
-IPv6_KHAREJ=$(echo "$IPv6_KHAREJ" | cut -d'/' -f1)
-
-if [ "$CHOICE" == "1" ]; then
+# تنظیمات برای ایران به خارج
+setup_iran_to_kharej() {
     echo "Setting up tunnel from Iran to Kharej..."
-
     ip tunnel add 6to4_To_KH mode sit remote $IPv4_KHAREJ local $IPv4_IRAN
     ip -6 addr add $IPv6_KHAREJ/64 dev 6to4_To_KH
     ip link set 6to4_To_KH mtu 1480
@@ -33,8 +39,24 @@ if [ "$CHOICE" == "1" ]; then
     iptables -t nat -A PREROUTING -p tcp --dport 22 -j DNAT --to-destination 172.20.20.1
     iptables -t nat -A PREROUTING -j DNAT --to-destination 172.20.20.2
     iptables -t nat -A POSTROUTING -j MASQUERADE
+}
 
-    echo "Adding to /etc/rc.local..."
+# تنظیمات برای خارج به ایران
+setup_kharej_to_iran() {
+    echo "Setting up tunnel from Kharej to Iran..."
+    ip tunnel add 6to4_To_IR mode sit remote $IPv4_IRAN local $IPv4_KHAREJ
+    ip -6 addr add $IPv6_IRAN/64 dev 6to4_To_IR
+    ip link set 6to4_To_IR mtu 1480
+    ip link set 6to4_To_IR up
+
+    ip -6 tunnel add GRE6Tun_To_IR mode ip6gre remote $IPv6_KHAREJ local $IPv6_IRAN
+    ip addr add 172.20.20.2/30 dev GRE6Tun_To_IR
+    ip link set GRE6Tun_To_IR mtu 1436
+    ip link set GRE6Tun_To_IR up
+}
+
+# اضافه کردن دستورات به rc.local
+add_to_rc_local() {
     sudo bash -c "cat > /etc/rc.local" <<EOF
 #!/bin/bash
 ip tunnel add 6to4_To_KH mode sit remote $IPv4_KHAREJ local $IPv4_IRAN
@@ -52,41 +74,47 @@ iptables -t nat -A PREROUTING -p tcp --dport 22 -j DNAT --to-destination 172.20.
 iptables -t nat -A PREROUTING -j DNAT --to-destination 172.20.20.2
 iptables -t nat -A POSTROUTING -j MASQUERADE
 EOF
+}
 
-elif [ "$CHOICE" == "2" ]; then
-    echo "Setting up tunnel from Kharej to Iran..."
+# تابع اصلی که عملیات را کنترل می‌کند
+main() {
+    # بررسی sudo
+    check_sudo
 
-    ip tunnel add 6to4_To_IR mode sit remote $IPv4_IRAN local $IPv4_KHAREJ
-    ip -6 addr add $IPv6_IRAN/64 dev 6to4_To_IR
-    ip link set 6to4_To_IR mtu 1480
-    ip link set 6to4_To_IR up
+    # دریافت اطلاعات از کاربر
+    read -p "Enter IP Server Iran: " IPv4_IRAN
+    read -p "Enter IP Server Out: " IPv4_KHAREJ
+    read -p "Enter IPv6 Local Iran: " IPv6_IRAN
+    read -p "Enter IPv6 Local Out: " IPv6_KHAREJ
 
-    ip -6 tunnel add GRE6Tun_To_IR mode ip6gre remote $IPv6_KHAREJ local $IPv6_IRAN
-    ip addr add 172.20.20.2/30 dev GRE6Tun_To_IR
-    ip link set GRE6Tun_To_IR mtu 1436
-    ip link set GRE6Tun_To_IR up
+    # ارائه گزینه‌ها
+    echo "Choose an option:"
+    echo "1 - Server Iran"
+    echo "2 - Server Kharej"
+    read -p "Enter your choice (1/2): " CHOICE
 
-    echo "Adding to /etc/rc.local..."
-    sudo bash -c "cat > /etc/rc.local" <<EOF
-#!/bin/bash
-ip tunnel add 6to4_To_IR mode sit remote $IPv4_IRAN local $IPv4_KHAREJ
-ip -6 addr add $IPv6_IRAN/64 dev 6to4_To_IR
-ip link set 6to4_To_IR mtu 1480
-ip link set 6to4_To_IR up
+    # حذف prefix از IPv6 (در صورت وجود)
+    IPv6_IRAN=$(echo "$IPv6_IRAN" | cut -d'/' -f1)
+    IPv6_KHAREJ=$(echo "$IPv6_KHAREJ" | cut -d'/' -f1)
 
-ip -6 tunnel add GRE6Tun_To_IR mode ip6gre remote $IPv6_KHAREJ local $IPv6_IRAN
-ip addr add 172.20.20.2/30 dev GRE6Tun_To_IR
-ip link set GRE6Tun_To_IR mtu 1436
-ip link set GRE6Tun_To_IR up
-EOF
+    # تنظیمات بر اساس انتخاب
+    if [ "$CHOICE" == "1" ]; then
+        setup_iran_to_kharej
+        add_to_rc_local
+    elif [ "$CHOICE" == "2" ]; then
+        setup_kharej_to_iran
+        add_to_rc_local
+    else
+        echo "Invalid option! Exiting..."
+        exit 1
+    fi
 
-else
-    echo "Invalid option! Exiting..."
-    exit 1
-fi
+    # دادن مجوز اجرایی به تمامی فایل‌های rc.local و اسکریپت‌ها
+    sudo chmod +x /etc/rc.local
+    sudo chmod +x install.sh  # مجوز اجرایی برای فایل نصب
 
-# دادن مجوز اجرایی به تمامی فایل‌های rc.local و اسکریپت‌ها
-sudo chmod +x /etc/rc.local
-sudo chmod +x install.sh  # مجوز اجرایی برای فایل نصب
+    echo "Setup completed!"
+}
 
-echo "Setup completed!"
+# اجرای تابع اصلی
+main
