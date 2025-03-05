@@ -124,11 +124,11 @@ main_menu() {
     case $choice in
         1)
             setup_iran_to_kharej
-            add_to_rc_local
+            add_to_rc_local_ir
             ;;
         2)
             setup_kharej_to_iran
-            add_to_rc_local
+            add_to_rc_local_out
             ;;
         3)
             echo "Exiting script..."
