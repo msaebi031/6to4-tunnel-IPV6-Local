@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# بررسی دسترسی sudo
+# تابع بررسی دسترسی sudo
 check_sudo() {
     if sudo -n true 2>/dev/null; then
         echo "This user has sudo permissions"
@@ -10,7 +10,7 @@ check_sudo() {
     fi
 }
 
-# نصب بسته‌ها
+# تابع نصب بسته‌ها
 install_package() {
     package=$1
     if ! command -v $package &> /dev/null; then
@@ -22,8 +22,17 @@ install_package() {
     fi
 }
 
-# تنظیمات برای ایران به خارج
+# تابع تنظیمات تونل از ایران به خارج
 setup_iran_to_kharej() {
+    echo "Enter the IPv4 address of Kharej: "
+    read IPv4_KHAREJ
+    echo "Enter the IPv4 address of Iran: "
+    read IPv4_IRAN
+    echo "Enter the IPv6 address of Kharej: "
+    read IPv6_KHAREJ
+    echo "Enter the IPv6 address of Iran: "
+    read IPv6_IRAN
+
     echo "Setting up tunnel from Iran to Kharej..."
     ip tunnel add 6to4_To_KH mode sit remote $IPv4_KHAREJ local $IPv4_IRAN
     ip -6 addr add $IPv6_KHAREJ/64 dev 6to4_To_KH
@@ -41,8 +50,17 @@ setup_iran_to_kharej() {
     iptables -t nat -A POSTROUTING -j MASQUERADE
 }
 
-# تنظیمات برای خارج به ایران
+# تابع تنظیمات تونل از خارج به ایران
 setup_kharej_to_iran() {
+    echo "Enter the IPv4 address of Kharej: "
+    read IPv4_KHAREJ
+    echo "Enter the IPv4 address of Iran: "
+    read IPv4_IRAN
+    echo "Enter the IPv6 address of Kharej: "
+    read IPv6_KHAREJ
+    echo "Enter the IPv6 address of Iran: "
+    read IPv6_IRAN
+
     echo "Setting up tunnel from Kharej to Iran..."
     ip tunnel add 6to4_To_IR mode sit remote $IPv4_IRAN local $IPv4_KHAREJ
     ip -6 addr add $IPv6_IRAN/64 dev 6to4_To_IR
@@ -55,7 +73,7 @@ setup_kharej_to_iran() {
     ip link set GRE6Tun_To_IR up
 }
 
-# اضافه کردن دستورات به rc.local
+# تابع تنظیمات اولیه rc.local
 add_to_rc_local() {
     sudo bash -c "cat > /etc/rc.local" <<EOF
 #!/bin/bash
@@ -76,45 +94,34 @@ iptables -t nat -A POSTROUTING -j MASQUERADE
 EOF
 }
 
-# تابع اصلی که عملیات را کنترل می‌کند
-main() {
-    # بررسی sudo
-    check_sudo
+# تابع منوی اصلی
+main_menu() {
+    echo "Welcome to Tunnel Setup"
+    echo "Please choose an option:"
+    echo "1. Set up tunnel from Iran to Kharej"
+    echo "2. Set up tunnel from Kharej to Iran"
+    echo "3. Exit"
+    read -p "Enter the number of your choice: " choice
 
-    # دریافت اطلاعات از کاربر
-    read -p "Enter IP Server Iran: " IPv4_IRAN
-    read -p "Enter IP Server Out: " IPv4_KHAREJ
-    read -p "Enter IPv6 Local Iran: " IPv6_IRAN
-    read -p "Enter IPv6 Local Out: " IPv6_KHAREJ
-
-    # ارائه گزینه‌ها
-    echo "Choose an option:"
-    echo "1 - Server Iran"
-    echo "2 - Server Kharej"
-    read -p "Enter your choice (1/2): " CHOICE
-
-    # حذف prefix از IPv6 (در صورت وجود)
-    IPv6_IRAN=$(echo "$IPv6_IRAN" | cut -d'/' -f1)
-    IPv6_KHAREJ=$(echo "$IPv6_KHAREJ" | cut -d'/' -f1)
-
-    # تنظیمات بر اساس انتخاب
-    if [ "$CHOICE" == "1" ]; then
-        setup_iran_to_kharej
-        add_to_rc_local
-    elif [ "$CHOICE" == "2" ]; then
-        setup_kharej_to_iran
-        add_to_rc_local
-    else
-        echo "Invalid option! Exiting..."
-        exit 1
-    fi
-
-    # دادن مجوز اجرایی به تمامی فایل‌های rc.local و اسکریپت‌ها
-    sudo chmod +x /etc/rc.local
-    sudo chmod +x install.sh  # مجوز اجرایی برای فایل نصب
-
-    echo "Setup completed!"
+    case $choice in
+        1)
+            setup_iran_to_kharej
+            add_to_rc_local
+            ;;
+        2)
+            setup_kharej_to_iran
+            add_to_rc_local
+            ;;
+        3)
+            echo "Exiting script..."
+            exit 0
+            ;;
+        *)
+            echo "Invalid option! Please select a valid option."
+            main_menu
+            ;;
+    esac
 }
 
-# اجرای تابع اصلی
-main
+# شروع منو
+main_menu
