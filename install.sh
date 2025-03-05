@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# تابع بررسی دسترسی sudo
+# تابع بررسی دسترسی sudo 
 check_sudo() {
     if sudo -n true 2>/dev/null; then
         echo "This user has sudo permissions"
