@@ -85,6 +85,8 @@ else
     exit 1
 fi
 
+# دادن مجوز اجرایی به تمامی فایل‌های rc.local و اسکریپت‌ها
 sudo chmod +x /etc/rc.local
-sudo chmod +x install.sh
+sudo chmod +x install.sh  # مجوز اجرایی برای فایل نصب
+
 echo "Setup completed!"
