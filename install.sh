@@ -86,4 +86,5 @@ else
 fi
 
 sudo chmod +x /etc/rc.local
+sudo chmod +x install.sh
 echo "Setup completed!"
