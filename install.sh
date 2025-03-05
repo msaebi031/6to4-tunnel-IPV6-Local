@@ -35,11 +35,11 @@ setup_iran_to_kharej() {
 
     echo "Setting up tunnel from Iran to Kharej..."
     ip tunnel add 6to4_To_KH mode sit remote $IPv4_KHAREJ local $IPv4_IRAN
-    ip -6 addr add $IPv6_KHAREJ/64 dev 6to4_To_KH
+    ip -6 addr add $IPv6_IRAN/64 dev 6to4_To_KH
     ip link set 6to4_To_KH mtu 1480
     ip link set 6to4_To_KH up
 
-    ip -6 tunnel add GRE6Tun_To_KH mode ip6gre remote $IPv6_IRAN local $IPv6_KHAREJ
+    ip -6 tunnel add GRE6Tun_To_KH mode ip6gre remote $IPv6_KHAREJ local $IPv6_IRAN
     ip addr add 172.20.20.1/30 dev GRE6Tun_To_KH
     ip link set GRE6Tun_To_KH mtu 1436
     ip link set GRE6Tun_To_KH up
@@ -64,27 +64,27 @@ setup_kharej_to_iran() {
 
     echo "Setting up tunnel from Kharej to Iran..."
     ip tunnel add 6to4_To_IR mode sit remote $IPv4_IRAN local $IPv4_KHAREJ
-    ip -6 addr add $IPv6_IRAN/64 dev 6to4_To_IR
+    ip -6 addr add $IPv6_KHAREJ/64 dev 6to4_To_IR
     ip link set 6to4_To_IR mtu 1480
     ip link set 6to4_To_IR up
 
-    ip -6 tunnel add GRE6Tun_To_IR mode ip6gre remote $IPv6_KHAREJ local $IPv6_IRAN
+    ip -6 tunnel add GRE6Tun_To_IR mode ip6gre remote $IPv6_IRAN local $IPv6_KHAREJ
     ip addr add 172.20.20.2/30 dev GRE6Tun_To_IR
     ip link set GRE6Tun_To_IR mtu 1436
     ip link set GRE6Tun_To_IR up
     echo "Setup completed!"
 }
 
-# تابع تنظیمات اولیه rc.local
-add_to_rc_local() {
+# تابع تنظیمات اولیه rc.local - ir
+add_to_rc_local_ir() {
     sudo bash -c "cat > /etc/rc.local" <<EOF
 #!/bin/bash
-ip tunnel add 6to4_To_KH mode sit remote $IPv4_KHAREJ local $IPv4_IRAN
-ip -6 addr add $IPv6_KHAREJ/64 dev 6to4_To_KH
+ip tunnel add 6to4_To_KH mode sit remote $IPv4_KHAREJ local <IPv4-IRAN>
+ip -6 addr add $IPv6_IRAN/64 dev 6to4_To_KH
 ip link set 6to4_To_KH mtu 1480
 ip link set 6to4_To_KH up
 
-ip -6 tunnel add GRE6Tun_To_KH mode ip6gre remote $IPv6_IRAN local $IPv6_KHAREJ
+ip -6 tunnel add GRE6Tun_To_KH mode ip6gre remote $IPv6_KHAREJ local $IPv6_IRAN
 ip addr add 172.20.20.1/30 dev GRE6Tun_To_KH
 ip link set GRE6Tun_To_KH mtu 1436
 ip link set GRE6Tun_To_KH up
@@ -92,7 +92,23 @@ ip link set GRE6Tun_To_KH up
 sysctl net.ipv4.ip_forward=1
 iptables -t nat -A PREROUTING -p tcp --dport 22 -j DNAT --to-destination 172.20.20.1
 iptables -t nat -A PREROUTING -j DNAT --to-destination 172.20.20.2
-iptables -t nat -A POSTROUTING -j MASQUERADE
+iptables -t nat -A POSTROUTING -j MASQUERADE 
+EOF
+}
+
+# تابع تنظیمات اولیه rc.local out
+add_to_rc_local_out() {
+    sudo bash -c "cat > /etc/rc.local" <<EOF
+#!/bin/bash
+ip tunnel add 6to4_To_IR mode sit remote $IPv4_IRAN local $IPv4_KHAREJ
+ip -6 addr add $IPv4_KHAREJ/64 dev 6to4_To_IR
+ip link set 6to4_To_IR mtu 1480
+ip link set 6to4_To_IR up
+
+ip -6 tunnel add GRE6Tun_To_IR mode ip6gre remote $IPv6_IRAN local $IPv6_KHAREJ
+ip addr add 172.20.20.2/30 dev GRE6Tun_To_IR
+ip link set GRE6Tun_To_IR mtu 1436
+ip link set GRE6Tun_To_IR up
 EOF
 }
 
