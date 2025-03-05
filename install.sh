@@ -48,6 +48,7 @@ setup_iran_to_kharej() {
     iptables -t nat -A PREROUTING -p tcp --dport 22 -j DNAT --to-destination 172.20.20.1
     iptables -t nat -A PREROUTING -j DNAT --to-destination 172.20.20.2
     iptables -t nat -A POSTROUTING -j MASQUERADE
+    echo "Setup completed!"
 }
 
 # تابع تنظیمات تونل از خارج به ایران
@@ -71,6 +72,7 @@ setup_kharej_to_iran() {
     ip addr add 172.20.20.2/30 dev GRE6Tun_To_IR
     ip link set GRE6Tun_To_IR mtu 1436
     ip link set GRE6Tun_To_IR up
+    echo "Setup completed!"
 }
 
 # تابع تنظیمات اولیه rc.local
